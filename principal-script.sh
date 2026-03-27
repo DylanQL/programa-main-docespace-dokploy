@@ -193,3 +193,15 @@ sincronizar_puertos() {
     echo -e "✅ Todo está perfectamente sincronizado. No se requieren nuevos túneles."
   fi
 }
+
+# ==========================================
+# EXTRAER USUARIOS DE GITHUB VÁLIDOS (SIN ERRORES)
+# ==========================================
+obtener_usuarios_github_validos() {
+  # 1. '2>&1' redirige los errores para poder filtrarlos.
+  # 2. 'grep "✓"' deja pasar SOLO las cuentas con éxito (ignora las X).
+  # 3. 'grep -i "logged in"' asegura la línea correcta.
+  # 4. 'sed' extrae el nombre sin importar si dice "account" o "as".
+
+  gh auth status 2>&1 | grep '✓' | grep -i 'logged in' | sed -E 's/.*(as|account) ([^ ]+).*/\2/' | sort -u | tr '\n' ' '
+}
