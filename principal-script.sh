@@ -212,3 +212,15 @@ obtener_usuarios_github_validos() {
 obtener_usuario_github_activo() {
   gh api user -q '.login' 2>/dev/null
 }
+
+# ==========================================
+# EXTRAER TODOS LOS USUARIOS DE GITHUB (VÁLIDOS E INVÁLIDOS)
+# ==========================================
+obtener_todos_los_usuarios_github() {
+  # 1. 2>&1: Redirige los errores para poder leerlos.
+  # 2. grep -E -i '(Logged in to|Failed)': Atrapa tanto las conexiones exitosas como los tokens caídos/fallidos.
+  # 3. sed -E: Extrae el nombre de usuario sin importar si la línea fue de éxito o de error.
+  # 4. sort -u y tr: Ordena, elimina duplicados y lo pone en una sola línea.
+
+  gh auth status 2>&1 | grep -E -i '(Logged in to|Failed)' | sed -E 's/.*(as|account) ([^ ]+).*/\2/' | sort -u | tr '\n' ' '
+}
