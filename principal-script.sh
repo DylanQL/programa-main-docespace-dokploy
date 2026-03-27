@@ -21,7 +21,7 @@ obtener_display_codespace() {
 # ==========================================
 mantener_codespace_vivo() {
   local servidor="$1"
-  local displayName = "$2"
+  local displayName="$2"
   echo -e "🛡️ [Fondo] Iniciando guardián Anti-Apagado para $displayName (Latido cada 60s)..."
 
   while true; do
