@@ -149,7 +149,6 @@ sincronizar_puertos() {
     if [ -n "$puertos_actuales" ]; then
       detener_puertos_locales_vinculados_gh "$puertos_actuales"
     fi
-    return 0 # Terminamos aquí con éxito
   fi
 
   # 2. RECOPILACIÓN DE DATOS (Las dos listas)
