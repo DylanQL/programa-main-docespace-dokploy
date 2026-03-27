@@ -56,3 +56,33 @@ obtener_puertos_locales_vinculados_gh() {
   # Usamos sudo para poder "ver" los túneles que fueron creados como root (ej. el puerto 80).
   sudo lsof -i -P -n 2>/dev/null | grep LISTEN | grep gh | grep '\*:' | awk '{print $9}' | cut -d':' -f2 | sort -nu | tr '\n' ' '
 }
+
+# ==========================================
+# DETENER TÚNELES VINCULADOS (LIMPIEZA)
+# ==========================================
+detener_puertos_locales_vinculados_gh() {
+  local puertos_a_cerrar="$1"
+
+  # 1. Validación de seguridad: Si la lista está vacía, no hacemos nada.
+  if [ -z "$puertos_a_cerrar" ]; then
+    echo -e "ℹ️ No hay ningún túnel activo para cerrar."
+    return 0
+  fi
+
+  echo -e "🛑 Iniciando el cierre de túneles locales..."
+
+  # 2. Bucle mágico: Recorremos cada puerto
+  for puerto in $puertos_a_cerrar; do
+    local pid
+    pid=$(sudo lsof -t -i TCP:"$puerto" -s TCP:LISTEN 2>/dev/null)
+
+    if [ -n "$pid" ]; then
+      sudo kill -9 $pid 2>/dev/null
+      echo -e "   🔒 Túnel en el puerto $puerto cerrado exitosamente."
+    else
+      echo -e "   ⚠️ El puerto $puerto ya estaba cerrado o no se encontró el proceso."
+    fi
+  done
+
+  echo -e "✅ Limpieza de puertos finalizada."
+}
