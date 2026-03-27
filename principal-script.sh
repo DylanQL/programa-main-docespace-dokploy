@@ -33,3 +33,18 @@ mantener_codespace_vivo() {
     sleep 60
   done
 }
+
+# ==========================================
+# EXTRACCIÓN DE PUERTOS DE DOCKER (CODESPACE)
+# ==========================================
+obtener_puertos_docker_del_codespace() {
+  local servidor="$1"
+
+  # 1. Traemos la información cruda del contenedor (sin filtros complejos por SSH)
+  local raw_ports
+  raw_ports=$(gh codespace ssh -c "$servidor" -- "docker ps --format '{{.Ports}}'" 2>/dev/null)
+
+  # 2. Procesamos el texto localmente (Tu lógica ganadora):
+  # Filtramos la flecha '->', cortamos el número, ordenamos sin duplicados y separamos por espacios.
+  echo "$raw_ports" | grep -oE '[0-9]+->' | cut -d'-' -f1 | sort -nu | tr '\n' ' '
+}
