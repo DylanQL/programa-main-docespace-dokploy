@@ -104,3 +104,30 @@ existen_registros_de_puertos_gh() {
     return 0 # TRUE: La lista tiene al menos un elemento (texto)
   fi
 }
+
+# ==========================================
+# VINCULAR PUERTOS AL CODESPACE (CREAR TÚNELES)
+# ==========================================
+vincular_puertos_locales_gh() {
+  local servidor="$1"
+  local puertos_a_vincular="$2"
+
+  # 1. Validación de seguridad: Si la lista está vacía, no hacemos nada.
+  if [ -z "$puertos_a_vincular" ]; then
+    return 0
+  fi
+
+  echo -e "🚀 Iniciando la vinculación de nuevos puertos..."
+
+  # 2. Bucle mágico: Recorremos cada puerto de la lista
+  for puerto in $puertos_a_vincular; do
+    echo -e "   🔗 Levantando túnel para el puerto $puerto..."
+
+    # Usamos sudo -E para poder abrir puertos como el 80 sin perder la auth de GitHub
+    sudo -E gh codespace ports forward "${puerto}:${puerto}" -c "$servidor" >/dev/null 2>&1 &
+  done
+
+  # Le damos un respiro de 1 segundo a la red para asimilar los túneles
+  sleep 1
+  echo -e "✅ Nuevos túneles establecidos en segundo plano."
+}
