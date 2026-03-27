@@ -86,3 +86,21 @@ detener_puertos_locales_vinculados_gh() {
 
   echo -e "✅ Limpieza de puertos finalizada."
 }
+
+# ==========================================
+# VERIFICACIÓN BOOLEANA: ¿HAY PUERTOS REGISTRADOS EN GH?
+# ==========================================
+existen_registros_de_puertos_gh() {
+  local servidor="$1"
+  local salida_puertos
+
+  # Ejecutamos el comando y guardamos el resultado, mandando los errores al agujero negro
+  salida_puertos=$(gh codespace ports -c "$servidor" 2>/dev/null)
+
+  # La bandera -z verifica si la variable está completamente vacía (Zero length)
+  if [ -z "$salida_puertos" ]; then
+    return 1 # FALSE: No hay lista, está vacío
+  else
+    return 0 # TRUE: La lista tiene al menos un elemento (texto)
+  fi
+}
