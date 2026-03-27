@@ -48,3 +48,11 @@ obtener_puertos_docker_del_codespace() {
   # Filtramos la flecha '->', cortamos el número, ordenamos sin duplicados y separamos por espacios.
   echo "$raw_ports" | grep -oE '[0-9]+->' | cut -d'-' -f1 | sort -nu | tr '\n' ' '
 }
+
+# ==========================================
+# EXTRACCIÓN DE PUERTOS LOCALES DE GH (TÚNELES ACTIVOS)
+# ==========================================
+obtener_puertos_locales_vinculados_gh() {
+  # Usamos sudo para poder "ver" los túneles que fueron creados como root (ej. el puerto 80).
+  sudo lsof -i -P -n 2>/dev/null | grep LISTEN | grep gh | grep '\*:' | awk '{print $9}' | cut -d':' -f2 | sort -nu | tr '\n' ' '
+}
