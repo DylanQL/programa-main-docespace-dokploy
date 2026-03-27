@@ -131,3 +131,66 @@ vincular_puertos_locales_gh() {
   sleep 1
   echo -e "✅ Nuevos túneles establecidos en segundo plano."
 }
+
+# ==========================================
+# CEREBRO: SINCRONIZACIÓN INTELIGENTE DE PUERTOS
+# ==========================================
+sincronizar_puertos() {
+  local servidor="$1"
+
+  echo -e "🔄 Iniciando sincronización inteligente de puertos..."
+
+  # 1. LA PRUEBA DE FUEGO: ¿GitHub tiene registros?
+  if ! existen_registros_de_puertos_gh "$servidor"; then
+    echo -e "⚠️ GitHub no reporta puertos abiertos. Procediendo a limpieza total..."
+    local puertos_actuales
+    puertos_actuales=$(obtener_puertos_locales_vinculados_gh)
+
+    if [ -n "$puertos_actuales" ]; then
+      detener_puertos_locales_vinculados_gh "$puertos_actuales"
+    fi
+    return 0 # Terminamos aquí con éxito
+  fi
+
+  # 2. RECOPILACIÓN DE DATOS (Las dos listas)
+  local puertos_docker
+  puertos_docker=$(obtener_puertos_docker_del_codespace "$servidor")
+
+  local puertos_locales
+  puertos_locales=$(obtener_puertos_locales_vinculados_gh)
+
+  echo -e "📦 Puertos que Dokploy necesita: [ $puertos_docker]"
+  echo -e "💻 Puertos que Fedora ya tiene:  [ $puertos_locales]"
+
+  # 3. IDENTIFICAR QUÉ SOBRA (Están en local, pero ya no en Docker)
+  local puertos_a_cerrar=""
+  for p_local in $puertos_locales; do
+    # TRUCO MÁGICO: Rodeamos de espacios " $lista " para buscar la palabra exacta
+    # Así evitamos que el puerto '80' coincida por error dentro de '8080'
+    if [[ ! " $puertos_docker " =~ " $p_local " ]]; then
+      puertos_a_cerrar="$puertos_a_cerrar $p_local"
+    fi
+  done
+
+  # Si encontramos puertos obsoletos, los destruimos
+  if [ -n "$puertos_a_cerrar" ]; then
+    echo -e "🗑️ Se detectaron túneles obsoletos. Cerrando: [$puertos_a_cerrar ]"
+    detener_puertos_locales_vinculados_gh "$puertos_a_cerrar"
+  fi
+
+  # 4. IDENTIFICAR QUÉ FALTA (Están en Docker, pero no en local)
+  local puertos_a_abrir=""
+  for p_docker in $puertos_docker; do
+    if [[ ! " $puertos_locales " =~ " $p_docker " ]]; then
+      puertos_a_abrir="$puertos_a_abrir $p_docker"
+    fi
+  done
+
+  # Si encontramos puertos faltantes, los abrimos
+  if [ -n "$puertos_a_abrir" ]; then
+    echo -e "✨ Se detectaron túneles faltantes. Abriendo: [$puertos_a_abrir ]"
+    vincular_puertos_locales_gh "$servidor" "$puertos_a_abrir"
+  else
+    echo -e "✅ Todo está perfectamente sincronizado. No se requieren nuevos túneles."
+  fi
+}
