@@ -289,15 +289,15 @@ preparar_sistema_dokploy() {
 }
 
 # ==========================================
-# 3. MIGRACIÓN Y RESTAURACIÓN
+# 3. MIGRACIÓN Y RESTAURACIÓN (DESDE EL VPS)
 # ==========================================
 migrar_backup_dokploy() {
-  local servidor_origen="$1"
-  local servidor_destino="$2"
+  local servidor_actual="$1"
 
-  echo -e "\n🚀 [FASE 3] Iniciando migración de datos..."
-  echo -e "   🌐 Transfiriendo archivo de backup desde $servidor_origen hacia $servidor_destino..."
-  echo -e "   📂 Descomprimiendo archivos en las rutas oficiales..."
-  echo -e "   ♻️  Restaurando base de datos y reiniciando contenedores de Dokploy..."
+  echo -e "\n🚀 [FASE 3] Iniciando restauración de datos en el nuevo servidor..."
+  echo -e "   🌐 Conectando al VPS para descargar el último backup..."
+  echo -e "   ⬇️  Transfiriendo archivo de respaldo hacia $servidor_actual..."
+  echo -e "   📂 Descomprimiendo archivos en las rutas oficiales de Dokploy..."
+  echo -e "   ♻️  Restaurando base de datos y levantando contenedores..."
   echo -e "🎉 ¡Migración completada! El panel está listo para usarse."
 }
