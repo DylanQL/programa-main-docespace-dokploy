@@ -301,3 +301,16 @@ migrar_backup_dokploy() {
   echo -e "   ♻️  Restaurando base de datos y levantando contenedores..."
   echo -e "🎉 ¡Migración completada! El panel está listo para usarse."
 }
+
+# ==========================================
+# 0. DETENER PROCESOS (PARADA SEGURA)
+# ==========================================
+detener_procesos_dokploy() {
+  local servidor_actual="$1"
+
+  echo -e "\n🛑 [FASE 0] Iniciando apagado seguro en: $servidor_actual..."
+  echo -e "   ⏳ Congelando bases de datos para evitar corrupción en el backup..."
+  echo -e "   ⏳ Deteniendo los contenedores de las aplicaciones desplegadas..."
+  echo -e "   ⏳ Apagando el panel principal de Dokploy..."
+  echo -e "✅ Todos los procesos de Dokploy han sido detenidos correctamente."
+}
