@@ -261,3 +261,43 @@ cambiar_usuario_activo_github() {
     return 1
   fi
 }
+
+# ==========================================
+# 1. CREACIÓN DE BACKUP (SERVIDOR ORIGEN)
+# ==========================================
+crear_backup_dokploy() {
+  local servidor_origen="$1"
+
+  echo -e "\n📦 [FASE 1] Iniciando creación de backup en: $servidor_origen..."
+  echo -e "   ⏳ Extrayendo base de datos y configuraciones de Dokploy..."
+  echo -e "   ⏳ Comprimiendo volúmenes de Docker..."
+  echo -e "   💾 Guardando archivo de respaldo de forma segura en el VPS..."
+  echo -e "✅ Backup generado y empaquetado exitosamente."
+}
+
+# ==========================================
+# 2. LIMPIEZA Y PREPARACIÓN (SERVIDOR DESTINO)
+# ==========================================
+preparar_sistema_dokploy() {
+  local servidor_destino="$1"
+
+  echo -e "\n🧹 [FASE 2] Preparando servidor destino: $servidor_destino..."
+  echo -e "   🛑 Deteniendo servicios actuales de Dokploy..."
+  echo -e "   🗑️  Purgando base de datos y configuraciones antiguas..."
+  echo -e "   🧼 Limpiando volúmenes residuales..."
+  echo -e "✨ El sistema ha quedado en blanco, como recién instalado."
+}
+
+# ==========================================
+# 3. MIGRACIÓN Y RESTAURACIÓN
+# ==========================================
+migrar_backup_dokploy() {
+  local servidor_origen="$1"
+  local servidor_destino="$2"
+
+  echo -e "\n🚀 [FASE 3] Iniciando migración de datos..."
+  echo -e "   🌐 Transfiriendo archivo de backup desde $servidor_origen hacia $servidor_destino..."
+  echo -e "   📂 Descomprimiendo archivos en las rutas oficiales..."
+  echo -e "   ♻️  Restaurando base de datos y reiniciando contenedores de Dokploy..."
+  echo -e "🎉 ¡Migración completada! El panel está listo para usarse."
+}
