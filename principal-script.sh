@@ -314,3 +314,172 @@ detener_procesos_dokploy() {
   echo -e "   ⏳ Apagando el panel principal de Dokploy..."
   echo -e "✅ Todos los procesos de Dokploy han sido detenidos correctamente."
 }
+
+DB_USUARIOS="registro_dokploy.db"
+
+# ==========================================
+# 1. SINCRONIZAR INVENTARIO DE USUARIOS (SQLITE)
+# ==========================================
+sincronizar_registro_usuarios() {
+  echo -e "🗄️  Sincronizando base de datos local de usuarios..."
+
+  # 1. Crear tabla si no existe (con los nombres de encabezado que pediste)
+  sqlite3 "$DB_USUARIOS" "CREATE TABLE IF NOT EXISTS usuarios (
+        username TEXT PRIMARY KEY,
+        bloqueado TEXT,
+        usado TEXT,
+        fecha_inicio TEXT,
+        fecha_fin TEXT,
+        horas_realizadas REAL,
+        cumplio_esperadas TEXT
+    );"
+
+  # 2. Insertar usuarios nuevos (si ya existen, SQLite ignora el comando por el PRIMARY KEY)
+  local todos_los_usuarios
+  todos_los_usuarios=$(obtener_todos_los_usuarios_github)
+
+  for user in $todos_los_usuarios; do
+    sqlite3 "$DB_USUARIOS" "INSERT OR IGNORE INTO usuarios (username, bloqueado, usado) VALUES ('$user', 'false', 'false');"
+  done
+
+  # 3. Eliminar del registro los usuarios que ya no están en GitHub CLI
+  local usuarios_en_db
+  usuarios_en_db=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios;")
+
+  for db_user in $usuarios_en_db; do
+    if [[ ! " $todos_los_usuarios " =~ " $db_user " ]]; then
+      sqlite3 "$DB_USUARIOS" "DELETE FROM usuarios WHERE username='$db_user';"
+      echo -e "   🗑️  Usuario $db_user eliminado del registro local."
+    fi
+  done
+
+  # 4. Bloquear a los usuarios con tokens inválidos/caídos
+  local usuarios_caidos
+  usuarios_caidos=$(obtener_usuarios_github_invalidos)
+
+  for caido in $usuarios_caidos; do
+    sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET bloqueado='true' WHERE username='$caido';"
+    echo -e "   🔒 Usuario $caido marcado como BLOQUEADO en la base de datos."
+  done
+
+  echo -e "✅ Sincronización de base de datos completada."
+}
+
+# ==========================================
+# 2. PROTOCOLO DE EMERGENCIA: USUARIO CAÍDO
+# ==========================================
+gestionar_caida_usuario_activo() {
+  local usuario_actual
+  usuario_actual=$(obtener_usuario_github_activo)
+
+  local usuarios_invalidos
+  usuarios_invalidos=$(obtener_usuarios_github_invalidos)
+
+  # 1. Comprobamos si el usuario actual está en la lista negra
+  if [[ " $usuarios_invalidos " =~ " $usuario_actual " ]]; then
+    echo -e "🚨 [ALERTA] El usuario activo ($usuario_actual) ha perdido la conexión/token."
+
+    # 2. Actualizamos su SQL: usado=true, fecha de fin exacta, cumplio=false y horas calculadas
+    sqlite3 "$DB_USUARIOS" "
+            UPDATE usuarios SET 
+                usado = 'true', 
+                fecha_fin = datetime('now', 'localtime'), 
+                cumplio_esperadas = 'false' 
+            WHERE username = '$usuario_actual';
+            
+            UPDATE usuarios SET 
+                horas_realizadas = ROUND((julianday(fecha_fin) - julianday(fecha_inicio)) * 24.0, 2) 
+            WHERE username = '$usuario_actual' AND fecha_inicio IS NOT NULL;
+        "
+
+    # 3. Buscamos al próximo candidato libre
+    local nuevo_candidato
+    nuevo_candidato=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios WHERE usado='false' AND bloqueado='false' LIMIT 1;")
+
+    if [ -z "$nuevo_candidato" ]; then
+      echo -e "❌ FATAL: No quedan usuarios disponibles (todos están usados o bloqueados)."
+      exit 1
+    fi
+
+    # 4. Hacemos el cambio
+    cambiar_usuario_activo_github "$nuevo_candidato"
+
+    # 5. Registramos la fecha de inicio del nuevo usuario
+    sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET fecha_inicio = datetime('now', 'localtime') WHERE username = '$nuevo_candidato';"
+
+    # 6. Preparamos el nuevo entorno (jalando el nombre del nuevo servidor)
+    local nuevo_servidor
+    nuevo_servidor=$(obtener_nombre_codespace)
+
+    preparar_sistema_dokploy "$nuevo_servidor"
+    migrar_backup_dokploy "$nuevo_servidor"
+  else
+    echo -e "✅ El usuario activo ($usuario_actual) se encuentra sano y operativo."
+  fi
+}
+
+# ==========================================
+# 3. ROTACIÓN PROGRAMADA (LÍMITE DE 27 HORAS)
+# ==========================================
+ejecutar_rotacion_por_tiempo() {
+  local usuario_actual
+  usuario_actual=$(obtener_usuario_github_activo)
+
+  echo -e "⏱️  Verificando tiempo de vida del usuario: $usuario_actual..."
+
+  # 1. Calculamos las horas transcurridas en decimales directamente desde SQLite
+  # Si la fecha_inicio es NULL (ej. primera vez que corre), asumimos 0 horas.
+  local horas_transcurridas
+  horas_transcurridas=$(sqlite3 "$DB_USUARIOS" "
+        SELECT IFNULL(ROUND((julianday(datetime('now', 'localtime')) - julianday(fecha_inicio)) * 24.0, 2), 0) 
+        FROM usuarios WHERE username = '$usuario_actual';
+    ")
+
+  echo -e "   ⏳ Horas consumidas: $horas_transcurridas / 27.0"
+
+  # 2. Bash no sabe comparar decimales, usamos 'awk' o 'bc' para saber si es mayor o igual a 27
+  if $(echo "$horas_transcurridas >= 27.0" | bc -l); then
+    echo -e "🔔 Tiempo límite alcanzado. Iniciando rotación programada..."
+
+    local servidor_actual
+    servidor_actual=$(obtener_nombre_codespace)
+
+    # 3. Extracción de datos del servidor viejo
+    detener_procesos_dokploy "$servidor_actual"
+    crear_backup_dokploy "$servidor_actual"
+
+    # 4. Actualizamos el registro del usuario que ya cumplió su ciclo
+    sqlite3 "$DB_USUARIOS" "
+            UPDATE usuarios SET 
+                fecha_fin = datetime('now', 'localtime'), 
+                usado = 'true', 
+                cumplio_esperadas = 'true' 
+            WHERE username = '$usuario_actual';
+            
+            UPDATE usuarios SET 
+                horas_realizadas = ROUND((julianday(fecha_fin) - julianday(fecha_inicio)) * 24.0, 2) 
+            WHERE username = '$usuario_actual';
+        "
+
+    # 5. Buscamos reemplazo
+    local nuevo_candidato
+    nuevo_candidato=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios WHERE usado='false' AND bloqueado='false' LIMIT 1;")
+
+    if [ -z "$nuevo_candidato" ]; then
+      echo -e "❌ FATAL: No quedan usuarios de repuesto para la rotación."
+      exit 1
+    fi
+
+    # 6. Salto al nuevo servidor
+    cambiar_usuario_activo_github "$nuevo_candidato"
+    sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET fecha_inicio = datetime('now', 'localtime') WHERE username = '$nuevo_candidato';"
+
+    local nuevo_servidor
+    nuevo_servidor=$(obtener_nombre_codespace)
+
+    preparar_sistema_dokploy "$nuevo_servidor"
+    migrar_backup_dokploy "$nuevo_servidor"
+  else
+    echo -e "✅ El usuario aún tiene tiempo disponible."
+  fi
+}
