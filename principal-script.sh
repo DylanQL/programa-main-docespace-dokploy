@@ -236,3 +236,28 @@ obtener_usuarios_github_invalidos() {
 
   gh auth status 2>&1 | grep 'X Failed' | sed -E 's/.*(as|account) ([^ ]+).*/\2/' | sort -u | tr '\n' ' '
 }
+
+# ==========================================
+# CAMBIAR USUARIO ACTIVO DE GITHUB
+# ==========================================
+cambiar_usuario_activo_github() {
+  local nuevo_usuario="$1"
+
+  # 1. Validación de seguridad: ¿Nos pasaron un nombre vacío?
+  if [ -z "$nuevo_usuario" ]; then
+    echo -e "❌ Error: No se proporcionó ningún nombre de usuario para el cambio."
+    return 1
+  fi
+
+  echo -e "🔄 Solicitando cambio de identidad a: $nuevo_usuario..."
+
+  # 2. Ejecutamos el comando ocultando la salida técnica (>/dev/null 2>&1)
+  # El 'if' evalúa automáticamente si el comando anterior tuvo éxito (código 0) o falló
+  if gh auth switch -u "$nuevo_usuario" >/dev/null 2>&1; then
+    echo -e "✅ ¡Identidad cambiada! Ahora estás operando al mando de: $nuevo_usuario"
+    return 0
+  else
+    echo -e "⚠️ Fallo en la matriz: No se pudo cambiar a '$nuevo_usuario'. ¿Estás seguro de que el token es válido?"
+    return 1
+  fi
+}
