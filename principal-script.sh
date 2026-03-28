@@ -224,3 +224,15 @@ obtener_todos_los_usuarios_github() {
 
   gh auth status 2>&1 | grep -E -i '(Logged in to|Failed)' | sed -E 's/.*(as|account) ([^ ]+).*/\2/' | sort -u | tr '\n' ' '
 }
+
+# ==========================================
+# EXTRAER USUARIOS DE GITHUB INVÁLIDOS (TOKENS CAÍDOS)
+# ==========================================
+obtener_usuarios_github_invalidos() {
+  # 1. '2>&1' redirige los errores para poder leerlos.
+  # 2. 'grep "X Failed"' es el filtro de francotirador: solo atrapa las líneas de error.
+  # 3. 'sed' extrae limpiamente el nombre del usuario, ignorando la ruta del archivo al final.
+  # 4. 'sort -u' y 'tr' limpian y formatean en una sola línea horizontal.
+
+  gh auth status 2>&1 | grep 'X Failed' | sed -E 's/.*(as|account) ([^ ]+).*/\2/' | sort -u | tr '\n' ' '
+}
