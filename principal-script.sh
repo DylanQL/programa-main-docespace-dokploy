@@ -430,6 +430,7 @@ gestionar_caida_usuario_activo() {
 
     preparar_sistema_dokploy "$nuevo_servidor"
     migrar_backup_dokploy "$nuevo_servidor"
+    iniciar_procesos_dokploy "$nuevo_servidor"
   else
     echo -e "✅ El usuario activo ($usuario_actual) se encuentra sano y operativo."
   fi
@@ -496,6 +497,7 @@ ejecutar_rotacion_por_tiempo() {
 
     preparar_sistema_dokploy "$nuevo_servidor"
     migrar_backup_dokploy "$nuevo_servidor"
+    iniciar_procesos_dokploy "$nuevo_servidor"
   else
     echo -e "✅ El usuario aún tiene tiempo disponible."
   fi
