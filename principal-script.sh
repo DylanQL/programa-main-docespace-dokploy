@@ -441,22 +441,24 @@ gestionar_caida_usuario_activo() {
 # ==========================================
 ejecutar_rotacion_por_tiempo() {
   local usuario_actual
+  local LIMITE_HORAS=27.0 # <-- Variable definida al inicio
+
   usuario_actual=$(obtener_usuario_github_activo)
 
   echo -e "⏱️  Verificando tiempo de vida del usuario: $usuario_actual..."
 
   # 1. Calculamos las horas transcurridas en decimales directamente desde SQLite
-  # Si la fecha_inicio es NULL (ej. primera vez que corre), asumimos 0 horas.
   local horas_transcurridas
   horas_transcurridas=$(sqlite3 "$DB_USUARIOS" "
         SELECT IFNULL(ROUND((julianday(datetime('now', 'localtime')) - julianday(fecha_inicio)) * 24.0, 2), 0) 
         FROM usuarios WHERE username = '$usuario_actual';
     ")
 
-  echo -e "   ⏳ Horas consumidas: $horas_transcurridas / 27.0"
+  echo -e "   ⏳ Horas consumidas: $horas_transcurridas / $LIMITE_HORAS"
 
-  # 2. Bash no sabe comparar decimales, usamos 'awk' o 'bc' para saber si es mayor o igual a 27
-  if $(echo "$horas_transcurridas >= 27.0" | bc -l); then
+  # 2. Comparamos los decimales usando bc.
+  # CORRECCIÓN: Se debe evaluar si la salida de bc es igual a 1 (verdadero)
+  if [ "$(echo "$horas_transcurridas >= $LIMITE_HORAS" | bc -l)" -eq 1 ]; then
     echo -e "🔔 Tiempo límite alcanzado. Iniciando rotación programada..."
 
     local servidor_actual
