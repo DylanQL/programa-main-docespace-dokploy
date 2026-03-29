@@ -299,7 +299,7 @@ migrar_backup_dokploy() {
   echo -e "   ⬇️  Transfiriendo archivo de respaldo hacia $servidor_actual..."
   echo -e "   📂 Descomprimiendo archivos en las rutas oficiales de Dokploy..."
   echo -e "   ♻️  Restaurando base de datos y levantando contenedores..."
-  echo -e "🎉 ¡Migración completada! El panel está listo para usarse."
+  echo -e "🎉 ¡Migración completada!."
 }
 
 # ==========================================
