@@ -303,7 +303,7 @@ migrar_backup_dokploy() {
 }
 
 # ==========================================
-# 0. DETENER PROCESOS (PARADA SEGURA)
+# 4. DETENER PROCESOS (PARADA SEGURA)
 # ==========================================
 detener_procesos_dokploy() {
   local servidor_actual="$1"
@@ -313,6 +313,23 @@ detener_procesos_dokploy() {
   echo -e "   ⏳ Deteniendo los contenedores de las aplicaciones desplegadas..."
   echo -e "   ⏳ Apagando el panel principal de Dokploy..."
   echo -e "✅ Todos los procesos de Dokploy han sido detenidos correctamente."
+}
+# ==========================================
+# 5. INICIAR PROCESOS (ARRANQUE SEGURO)
+# ==========================================
+iniciar_procesos_dokploy() {
+  local servidor_destino="$1"
+
+  echo -e "\n⚡ [FASE 4] Iniciando servicios de Dokploy en: $servidor_destino..."
+  echo -e "   🚀 Levantando el panel principal de Dokploy..."
+  echo -e "   📦 Arrancando contenedores de aplicaciones y servicios..."
+  echo -e "   🔄 Sincronizando configuraciones de red y certificados SSL..."
+  echo -e "   🩺 Realizando Health Check de los servicios activos..."
+
+  # Aquí podrías añadir un comando real como:
+  # docker start $(docker ps -a -q -f name=dokploy)
+
+  echo -e "✅ ¡Sistema Dokploy totalmente operativo y en línea!"
 }
 
 DB_USUARIOS="registro_dokploy.db"
