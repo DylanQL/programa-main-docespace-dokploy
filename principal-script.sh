@@ -379,6 +379,21 @@ sincronizar_registro_usuarios() {
     echo -e "   🔒 Usuario $caido marcado como BLOQUEADO en la base de datos."
   done
 
+  # 5. Desbloquear a los usuarios que recuperaron su conexión/token
+  local usuarios_validos
+  usuarios_validos=$(obtener_usuarios_github_validos)
+
+  local usuarios_bloqueados
+  usuarios_bloqueados=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios WHERE bloqueado='true';")
+
+  for bloqueado in $usuarios_bloqueados; do
+    # Si el usuario bloqueado AHORA aparece en la lista de los válidos...
+    if [[ " $usuarios_validos " =~ " $bloqueado " ]]; then
+      sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET bloqueado='false' WHERE username='$bloqueado';"
+      echo -e "   🔓 Usuario $bloqueado ha recuperado su token. Marcado como DESBLOQUEADO."
+    fi
+  done
+
   echo -e "✅ Sincronización de base de datos completada."
 }
 
