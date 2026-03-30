@@ -23,7 +23,7 @@ mantener_codespace_vivo() {
   echo -e "🛡️ [Fondo] Iniciando guardián Anti-Apagado para codespaces (Latido cada 60s)..."
 
   while true; do
-    local servidor= $(obtener_nombre_codespace)
+    local servidor=$(obtener_nombre_codespace)
     # Nos conectamos, hacemos un echo y salimos al instante.
     # '> /dev/null 2>&1' agarra todo el texto (y posibles errores) y los lanza al agujero negro para no ensuciar tu pantalla.
     gh codespace ssh -c "$servidor" -- echo "latido" >/dev/null 2>&1
