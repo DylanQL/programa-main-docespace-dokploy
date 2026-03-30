@@ -210,7 +210,7 @@ obtener_usuarios_github_validos() {
 # EXTRAER EL USUARIO ACTIVO DE GITHUB
 # ==========================================
 obtener_usuario_github_activo() {
-  gh api user -q '.login' 2>/dev/null
+  gh auth status 2>&1 | grep -B 1 'Active account: true' | head -n 1 | sed -E 's/.*(as|account) ([^ ]+).*/\2/'
 }
 
 # ==========================================
