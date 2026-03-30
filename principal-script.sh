@@ -374,9 +374,16 @@ sincronizar_registro_usuarios() {
   local usuarios_caidos
   usuarios_caidos=$(obtener_usuarios_github_invalidos)
 
+  # Obtenemos quiénes ya están marcados como bloqueados en la DB actualmente
+  local usuarios_ya_bloqueados
+  usuarios_ya_bloqueados=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios WHERE bloqueado='true';")
+
   for caido in $usuarios_caidos; do
-    sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET bloqueado='true' WHERE username='$caido';"
-    echo -e "   🔒 Usuario $caido marcado como BLOQUEADO en la base de datos."
+    # Comparamos: Si el usuario caído NO está en la lista de los que ya están bloqueados...
+    if [[ ! " $usuarios_ya_bloqueados " =~ " $caido " ]]; then
+      sqlite3 "$DB_USUARIOS" "UPDATE usuarios SET bloqueado='true' WHERE username='$caido';"
+      echo -e "   🔒 Alerta: Usuario $caido detectado como caído. Marcado como BLOQUEADO."
+    fi
   done
 
   # 5. Desbloquear a los usuarios que recuperaron su conexión/token
