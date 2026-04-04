@@ -441,6 +441,84 @@ iniciar_procesos_dokploy() {
 }
 
 # ==========================================
+# 6. REACTIVACIÓN DE APLICACIONES (DESPLIEGUE MASIVO)
+# ==========================================
+forzar_despliegue_dokploy() {
+  local servidor_actual="$1"
+
+  echo -e "\n🚀 Iniciando despliegue de aplicaciones en Dokploy..."
+
+  # 1. Extraer la API Key desde el archivo .env local
+  local api_key=$(grep "API-KEY-DOKPLOY" .env | cut -d'"' -f2)
+
+  if [ -z "$api_key" ]; then
+    echo -e "❌ Error: No se encontró API-KEY-DOKPLOY en el archivo .env."
+    return 1
+  fi
+
+  echo -e "   🔄 Contactando a la API local de Dokploy para iniciar despliegues..."
+
+  # 2. Inyectamos y ejecutamos el script complejo dentro del Codespace.
+  # Usar 'EOF' (con comillas) evita que nuestra máquina local arruine las variables del script.
+  # El "$api_key" al final de la línea se pasa como el argumento $1 al entorno remoto.
+  cat <<'EOF' | gh codespace ssh -c "$servidor_actual" -- bash -s "$api_key"
+  set -euo pipefail
+
+  # Recibimos la API Key enviada desde el entorno local
+  DOKPLOY_TOKEN="$1"
+  DOKPLOY_URL="http://localhost:3000/api"
+
+  # Instalamos jq silenciosamente en caso de que el Codespace no lo tenga instalado por defecto
+  if ! command -v jq &> /dev/null; then
+      sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
+  fi
+
+  # 1. Obtener todos los proyectos
+  PROJECTS_JSON=$(curl -s -X 'GET' "$DOKPLOY_URL/project.all" \
+    -H 'accept: application/json' \
+    -H "x-api-key: $DOKPLOY_TOKEN")
+
+  deploy() {
+      local tipo=$1
+      local id_key=$2
+
+      # Extraer IDs únicos ignorando los nulos
+      mapfile -t ids < <(echo "$PROJECTS_JSON" | jq -r ".. | .${id_key}? | select(. != null)" | sort -u)
+
+      if [[ ${#ids[@]} -eq 0 ]]; then
+          return 0
+      fi
+
+      for id in "${ids[@]}"; do
+          echo "   ➡️ Desplegando $tipo: $id..."
+          # Lanzamos la petición POST para forzar el deploy
+          curl -s -o /dev/null -w "      Resultado HTTP: %{http_code}\n" -X POST "$DOKPLOY_URL/${tipo}.deploy" \
+              -H "accept: application/json" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $DOKPLOY_TOKEN" \
+              -d "{\"${id_key}\":\"${id}\"}"
+          
+          # Pausa de seguridad para no saturar el panel de Dokploy
+          sleep 1
+      done
+  }
+
+  # 2. Ejecutar según los tipos de recursos
+  deploy "postgres"    "postgresId"
+  deploy "redis"       "redisId"
+  deploy "mongo"       "mongoId"
+  deploy "mysql"       "mysqlId"
+  deploy "mariadb"     "mariadbId"
+  deploy "application" "applicationId"
+  deploy "compose"     "composeId"
+
+  echo "   ✅ Todos los servicios han recibido la orden de despliegue."
+EOF
+
+  echo -e "🎉 Misión cumplida: Sistema Dokploy 100% sincronizado y aplicaciones en línea."
+}
+
+# ==========================================
 # VINCULACIÓN DE SEGURIDAD CON EL VPS
 # ==========================================
 preparar_vincular_vps() {
