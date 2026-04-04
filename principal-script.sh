@@ -267,11 +267,40 @@ cambiar_usuario_activo_github() {
 crear_backup_dokploy() {
   local servidor_origen="$1"
 
+  # 1. Extraer datos del .env local
+  local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
+  local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
+
+  # 2. Generar el nombre de la carpeta basado en la fecha/hora actual
+  # Formato: 2023-10-27_14-30-05
+  local timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+  local ruta_remota="/home/$vps_user/backups_dokploy/$timestamp"
+
   echo -e "\n📦 [FASE 1] Iniciando creación de backup en: $servidor_origen..."
-  echo -e "   ⏳ Extrayendo base de datos y configuraciones de Dokploy..."
-  echo -e "   ⏳ Comprimiendo volúmenes de Docker..."
-  echo -e "   💾 Guardando archivo de respaldo de forma segura en el VPS..."
-  echo -e "✅ Backup generado y empaquetado exitosamente."
+  echo -e "   📂 Carpeta de destino en VPS: $timestamp"
+
+  # 3. Ejecutar la lógica dentro del Codespace
+  # Usamos la llave que subimos anteriormente (~/LLave.pem)
+  gh codespace ssh -c "$servidor_origen" -- "
+    echo '   ⏳ Preparando directorios en el VPS...'
+    # Creamos la carpeta principal y las subcarpetas dentro del VPS
+    ssh -i ~/LLave.pem -o StrictHostKeyChecking=no $vps_user@$vps_ip 'mkdir -p $ruta_remota/dokploy $ruta_remota/volumes'
+
+    echo '   ⏳ Sincronizando configuraciones (/etc/dokploy)...'
+    # Usamos sudo para rsync porque /etc/dokploy y /var/lib/docker son del root
+    # Es vital pasar la ruta completa de la llave porque sudo cambia el contexto de usuario
+    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' /etc/dokploy/ $vps_user@$vps_ip:$ruta_remota/dokploy/
+
+    echo '   ⏳ Sincronizando volúmenes de Docker (/var/lib/docker/volumes)...'
+    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' /var/lib/docker/volumes/ $vps_user@$vps_ip:$ruta_remota/volumes/
+  "
+
+  if [ $? -eq 0 ]; then
+    echo -e "✅ Backup generado y enviado al VPS exitosamente en: $ruta_remota"
+  else
+    echo -e "❌ Error crítico durante la transferencia del backup."
+    return 1
+  fi
 }
 
 # ==========================================
