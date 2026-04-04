@@ -276,6 +276,10 @@ crear_backup_dokploy() {
   local timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
   local ruta_remota="/home/$vps_user/backups_dokploy/$timestamp"
 
+  # ---> EL TOQUE MAESTRO <---
+  # Apagamos los servicios de forma segura antes de copiar nada
+  detener_procesos_dokploy "$servidor_origen"
+
   echo -e "\n📦 Iniciando creación de backup en: $servidor_origen..."
   echo -e "   📂 Carpeta de destino en VPS: $timestamp"
 
