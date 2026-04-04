@@ -343,12 +343,54 @@ preparar_sistema_dokploy() {
 migrar_backup_dokploy() {
   local servidor_actual="$1"
 
-  echo -e "\n🚀 [FASE 3] Iniciando restauración de datos en el nuevo servidor..."
-  echo -e "   🌐 Conectando al VPS para descargar el último backup..."
-  echo -e "   ⬇️  Transfiriendo archivo de respaldo hacia $servidor_actual..."
-  echo -e "   📂 Descomprimiendo archivos en las rutas oficiales de Dokploy..."
-  echo -e "   ♻️  Restaurando base de datos y levantando contenedores..."
-  echo -e "🎉 ¡Migración completada!."
+  # 1. Extraer datos del .env local
+  local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
+  local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
+
+  echo -e "\n🚀 Iniciando restauración de datos en el nuevo servidor..."
+  echo -e "   🌐 Conectando al VPS para identificar el último backup..."
+
+  # 2. Buscar la carpeta más reciente en el VPS (usando la llave local)
+  local ultimo_backup
+  ultimo_backup=$(ssh -i LLave.pem -o StrictHostKeyChecking=no "$vps_user@$vps_ip" "ls -1 /home/$vps_user/backups_dokploy/ | sort | tail -n 1")
+
+  if [ -z "$ultimo_backup" ]; then
+    echo -e "❌ Error crítico: No se encontró ningún backup en el VPS."
+    return 1
+  fi
+
+  echo -e "   ⬇️ Transfiriendo backup: [$ultimo_backup] hacia $servidor_actual..."
+
+  # 3. Descargar los archivos con rsync
+  gh codespace ssh -c "$servidor_actual" -- "
+    echo '   📂 Restaurando configuraciones de Dokploy...'
+    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/dokploy/ /etc/dokploy/
+    
+    echo '   📂 Restaurando volúmenes de Docker...'
+    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/volumes/ /var/lib/docker/volumes/
+  " >/dev/null 2>&1
+
+  # 4. Primer arranque para poder aplicar el parche de Postgres
+  iniciar_procesos_dokploy "$servidor_actual"
+
+  # 5. Sincronizar credenciales de la base de datos PostgreSQL
+  echo -e "   🔑 Sincronizando credenciales de la base de datos..."
+  gh codespace ssh -c "$servidor_actual" -- "
+    CONTENEDOR_PG=\$(docker ps -qf 'name=dokploy-postgres' | head -n 1)
+    if [ -n \"\$CONTENEDOR_PG\" ]; then
+      CLAVE_PG=\$(docker exec \"\$CONTENEDOR_PG\" cat /run/secrets/postgres_password)
+      docker exec -e PGPASSWORD='x' \"\$CONTENEDOR_PG\" psql -U dokploy -d dokploy -c \"ALTER USER dokploy WITH PASSWORD '\$CLAVE_PG';\" >/dev/null 2>&1
+      echo '   ✅ Contraseña de base de datos sincronizada.'
+    fi
+  "
+
+  # 6. CICLO FINAL DE REINICIO (Tu toque maestro)
+  echo -e "   🔄 Realizando reinicio final para estabilizar servicios..."
+
+  detener_procesos_dokploy "$servidor_actual"
+  iniciar_procesos_dokploy "$servidor_actual"
+
+  echo -e "🎉 ¡Migración completada y sistema reiniciado exitosamente!"
 }
 
 # ==========================================
