@@ -375,6 +375,8 @@ migrar_backup_dokploy() {
     sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/volumes/ /var/lib/docker/volumes/
   " >/dev/null 2>&1
 
+  sleep 10
+
   # 4. Primer arranque para poder aplicar el parche de Postgres
   iniciar_procesos_dokploy "$servidor_actual"
 
@@ -389,6 +391,7 @@ migrar_backup_dokploy() {
     fi
   "
 
+  sleep 10
   # 6. CICLO FINAL DE REINICIO (Tu toque maestro)
   echo -e "   🔄 Realizando reinicio final para estabilizar servicios..."
 
