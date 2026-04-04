@@ -276,7 +276,7 @@ crear_backup_dokploy() {
   local timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
   local ruta_remota="/home/$vps_user/backups_dokploy/$timestamp"
 
-  echo -e "\n📦 [FASE 1] Iniciando creación de backup en: $servidor_origen..."
+  echo -e "\n📦 Iniciando creación de backup en: $servidor_origen..."
   echo -e "   📂 Carpeta de destino en VPS: $timestamp"
 
   # 3. Ejecutar la lógica dentro del Codespace
