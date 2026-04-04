@@ -309,10 +309,31 @@ crear_backup_dokploy() {
 preparar_sistema_dokploy() {
   local servidor_destino="$1"
 
-  echo -e "\n🧹 [FASE 2] Preparando servidor destino: $servidor_destino..."
-  echo -e "   🛑 Deteniendo servicios actuales de Dokploy..."
-  echo -e "   🗑️  Purgando base de datos y configuraciones antiguas..."
-  echo -e "   🧼 Limpiando volúmenes residuales..."
+  echo -e "\n🧹 Preparando servidor destino: $servidor_destino..."
+
+  # 1. Apagamos de forma segura reutilizando nuestra función
+  detener_procesos_dokploy "$servidor_destino"
+
+  # 2. Purgamos y recreamos los directorios clave
+  echo -e "   🗑️ Purgando base de datos y configuraciones antiguas..."
+  gh codespace ssh -c "$servidor_destino" -- "
+    sudo rm -rf /etc/dokploy /var/lib/docker/volumes
+    sudo mkdir -p /etc/dokploy /var/lib/docker/volumes
+  " >/dev/null 2>&1
+
+  # 3. Arrancamos Docker temporalmente reutilizando la función (que ya incluye el sleep de 15s)
+  iniciar_procesos_dokploy "$servidor_destino"
+
+  # 4. Limpiamos servicios residuales de Docker Swarm, protegiendo los núcleos de Dokploy
+  echo -e "   🧼 Limpiando servicios residuales..."
+  gh codespace ssh -c "$servidor_destino" -- "
+    docker service ls --format '{{.Name}}' | grep -vE '^dokploy$|^dokploy-postgres$|^dokploy-redis$|^dokploy-traefik$' | xargs -r docker service rm
+  " >/dev/null 2>&1
+  sleep 10
+
+  # 5. Volvemos a apagar para que la Fase 3 (Migración) pueda inyectar los archivos sin bloqueos
+  detener_procesos_dokploy "$servidor_destino"
+
   echo -e "✨ El sistema ha quedado en blanco, como recién instalado."
 }
 
