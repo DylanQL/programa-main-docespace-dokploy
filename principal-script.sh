@@ -397,6 +397,7 @@ migrar_backup_dokploy() {
 
   detener_procesos_dokploy "$servidor_actual"
   iniciar_procesos_dokploy "$servidor_actual"
+  forzar_despliegue_dokploy "$servidor_actual"
 
   echo -e "🎉 ¡Migración completada y sistema reiniciado exitosamente!"
 }
