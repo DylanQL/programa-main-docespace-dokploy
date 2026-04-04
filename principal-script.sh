@@ -597,7 +597,7 @@ gestionar_caida_usuario_activo() {
     local nuevo_servidor
     nuevo_servidor=$(obtener_nombre_codespace)
 
-    preparar_vincular_vps
+    preparar_vincular_vps "$nuevo_servidor"
     preparar_sistema_dokploy "$nuevo_servidor"
     migrar_backup_dokploy "$nuevo_servidor"
   else
