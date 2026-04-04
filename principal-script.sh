@@ -634,7 +634,7 @@ ejecutar_rotacion_por_tiempo() {
     servidor_actual=$(obtener_nombre_codespace)
 
     # 3. Extracción de datos del servidor viejo
-    detener_procesos_dokploy "$servidor_actual"
+    preparar_vincular_vps "$servidor_actual"
     crear_backup_dokploy "$servidor_actual"
 
     # 4. Actualizamos el registro del usuario que ya cumplió su ciclo
@@ -666,9 +666,9 @@ ejecutar_rotacion_por_tiempo() {
     local nuevo_servidor
     nuevo_servidor=$(obtener_nombre_codespace)
 
+    preparar_vincular_vps "$nuevo_servidor"
     preparar_sistema_dokploy "$nuevo_servidor"
     migrar_backup_dokploy "$nuevo_servidor"
-    iniciar_procesos_dokploy "$nuevo_servidor"
   else
     echo -e "✅ El usuario aún tiene tiempo disponible."
   fi
