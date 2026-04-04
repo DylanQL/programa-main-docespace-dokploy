@@ -340,6 +340,45 @@ iniciar_procesos_dokploy() {
   echo -e "✅ ¡Sistema Dokploy totalmente operativo y en línea!"
 }
 
+# ==========================================
+# VINCULACIÓN DE SEGURIDAD CON EL VPS
+# ==========================================
+preparar_vincular_vps() {
+  local servidor_codespace="$1"
+
+  echo -e "\n🔑 [CONFIG] Configurando acceso seguro al VPS desde el Codespace..."
+
+  # 1. Extraer datos del archivo .env local
+  # Usamos grep y cut para obtener los valores dentro de las comillas
+  local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
+  local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
+
+  if [ -z "$vps_ip" ] || [ -z "$vps_user" ]; then
+    echo -e "❌ Error: No se pudo obtener la IP o el Usuario del VPS desde el archivo .env"
+    return 1
+  fi
+
+  echo -e "   📦 Transfiriendo llave privada (LLave.pem)..."
+
+  # 2. Enviar el contenido de LLave.pem al Codespace
+  # 'cat LLave.pem' lee el archivo local y lo inyecta vía SSH al 'cat' remoto
+  cat LLave.pem | gh codespace ssh -c "$servidor_codespace" -- "cat > ~/LLave.pem"
+
+  # 3. Ajustar permisos y pre-aprobar el SSH (Known Hosts)
+  echo -e "   🔐 Ajustando permisos y pre-aprobando identidad del VPS..."
+
+  gh codespace ssh -c "$servidor_codespace" -- "
+    # Cambiamos permisos a la llave
+    chmod 400 ~/LLave.pem
+    
+    # Ejecutamos un comando SSH rápido (exit) para forzar la aceptación de la llave del host
+    # Esto evita que el script se trabe preguntando 'Are you sure you want to continue connecting?'
+    ssh -o StrictHostKeyChecking=accept-new -i ~/LLave.pem $vps_user@$vps_ip exit
+  " >/dev/null 2>&1
+
+  echo -e "✅ Conexión Codespace -> VPS autorizada y lista."
+}
+
 DB_USUARIOS="registro_dokploy.db"
 
 # ==========================================
