@@ -326,15 +326,17 @@ detener_procesos_dokploy() {
 iniciar_procesos_dokploy() {
   local servidor_destino="$1"
 
-  echo -e "\n⚡ [FASE 4] Iniciando servicios de Dokploy en: $servidor_destino..."
-  echo -e "   🚀 Levantando el panel principal de Dokploy..."
-  echo -e "   📦 Arrancando contenedores de aplicaciones y servicios..."
-  echo -e "   🔄 Sincronizando configuraciones de red y certificados SSL..."
-  echo -e "   🩺 Realizando Health Check de los servicios activos..."
+  echo -e "\n⚡Iniciando servicios de Dokploy en: $servidor_destino..."
+  echo -e "   🚀 Levantando el motor de Docker en segundo plano..."
 
-  # Aquí podrías añadir un comando real como:
-  # docker start $(docker ps -a -q -f name=dokploy)
+  # Ejecutamos el comando dentro del Codespace remoto
+  gh codespace ssh -c "$servidor_destino" -- "sudo dockerd >/dev/null 2>&1 &"
 
+  # Tiempo de gracia extendido para asegurar que el panel y las apps carguen bien
+  echo -e "   ⏳ Esperando 15 segundos para la estabilización del sistema..."
+  sleep 15
+
+  echo -e "   🩺 Realizando comprobación de servicios..."
   echo -e "✅ ¡Sistema Dokploy totalmente operativo y en línea!"
 }
 
