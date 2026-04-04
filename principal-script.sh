@@ -345,6 +345,7 @@ preparar_sistema_dokploy() {
 # 3. MIGRACIÓN Y RESTAURACIÓN (DESDE EL VPS)
 # ==========================================
 migrar_backup_dokploy() {
+  #Aqui ya no se detiene porque en la funcion preparar_sistema_dokploy ya se detuvo el servicio de dokploy
   local servidor_actual="$1"
 
   # 1. Extraer datos del .env local
