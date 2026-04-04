@@ -267,36 +267,25 @@ cambiar_usuario_activo_github() {
 crear_backup_dokploy() {
   local servidor_origen="$1"
 
-  # 1. Extraer datos del .env local
   local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
   local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
-
-  # 2. Generar el nombre de la carpeta basado en la fecha/hora actual
-  # Formato: 2023-10-27_14-30-05
   local timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
   local ruta_remota="/home/$vps_user/backups_dokploy/$timestamp"
 
-  # ---> EL TOQUE MAESTRO <---
-  # Apagamos los servicios de forma segura antes de copiar nada
   detener_procesos_dokploy "$servidor_origen"
 
   echo -e "\n📦 Iniciando creación de backup en: $servidor_origen..."
   echo -e "   📂 Carpeta de destino en VPS: $timestamp"
 
-  # 3. Ejecutar la lógica dentro del Codespace
-  # Usamos la llave que subimos anteriormente (~/LLave.pem)
   gh codespace ssh -c "$servidor_origen" -- "
     echo '   ⏳ Preparando directorios en el VPS...'
-    # Creamos la carpeta principal y las subcarpetas dentro del VPS
-    ssh -i ~/LLave.pem -o StrictHostKeyChecking=no $vps_user@$vps_ip 'mkdir -p $ruta_remota/dokploy $ruta_remota/volumes'
+    ssh -i /home/vscode/LLave.pem -o StrictHostKeyChecking=no $vps_user@$vps_ip 'mkdir -p $ruta_remota/dokploy $ruta_remota/volumes'
 
     echo '   ⏳ Sincronizando configuraciones (/etc/dokploy)...'
-    # Usamos sudo para rsync porque /etc/dokploy y /var/lib/docker son del root
-    # Es vital pasar la ruta completa de la llave porque sudo cambia el contexto de usuario
-    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' /etc/dokploy/ $vps_user@$vps_ip:$ruta_remota/dokploy/
+    sudo rsync -avz -e 'ssh -i /home/vscode/LLave.pem -o StrictHostKeyChecking=no' /etc/dokploy/ $vps_user@$vps_ip:$ruta_remota/dokploy/
 
     echo '   ⏳ Sincronizando volúmenes de Docker (/var/lib/docker/volumes)...'
-    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' /var/lib/docker/volumes/ $vps_user@$vps_ip:$ruta_remota/volumes/
+    sudo rsync -avz -e 'ssh -i /home/vscode/LLave.pem -o StrictHostKeyChecking=no' /var/lib/docker/volumes/ $vps_user@$vps_ip:$ruta_remota/volumes/
   "
 
   if [ $? -eq 0 ]; then
@@ -345,42 +334,38 @@ preparar_sistema_dokploy() {
 # 3. MIGRACIÓN Y RESTAURACIÓN (DESDE EL VPS)
 # ==========================================
 migrar_backup_dokploy() {
-  #Aqui ya no se detiene porque en la funcion preparar_sistema_dokploy ya se detuvo el servicio de dokploy
   local servidor_actual="$1"
 
-  # 1. Extraer datos del .env local
   local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
   local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
 
   echo -e "\n🚀 Iniciando restauración de datos en el nuevo servidor..."
   echo -e "   🌐 Conectando al VPS para identificar el último backup..."
 
-  # 2. Buscar la carpeta más reciente en el VPS (usando la llave local)
+  chmod 400 LLave.pem
+
+  # Filtro añadido para que solo agarre carpetas con formato de fecha (202x-...)
   local ultimo_backup
-  ultimo_backup=$(ssh -i LLave.pem -o StrictHostKeyChecking=no "$vps_user@$vps_ip" "ls -1 /home/$vps_user/backups_dokploy/ | sort | tail -n 1")
+  ultimo_backup=$(ssh -i LLave.pem -o StrictHostKeyChecking=no "$vps_user@$vps_ip" "ls -1 /home/$vps_user/backups_dokploy/ | grep '^202' | sort | tail -n 1")
 
   if [ -z "$ultimo_backup" ]; then
-    echo -e "❌ Error crítico: No se encontró ningún backup en el VPS."
+    echo -e "❌ Error crítico: No se encontró ningún backup válido en el VPS."
     return 1
   fi
 
   echo -e "   ⬇️ Transfiriendo backup: [$ultimo_backup] hacia $servidor_actual..."
 
-  # 3. Descargar los archivos con rsync
   gh codespace ssh -c "$servidor_actual" -- "
     echo '   📂 Restaurando configuraciones de Dokploy...'
-    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/dokploy/ /etc/dokploy/
+    sudo rsync -avz -e 'ssh -i /home/vscode/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/dokploy/ /etc/dokploy/
     
     echo '   📂 Restaurando volúmenes de Docker...'
-    sudo rsync -avz -e 'ssh -i /home/codespace/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/volumes/ /var/lib/docker/volumes/
+    sudo rsync -avz -e 'ssh -i /home/vscode/LLave.pem -o StrictHostKeyChecking=no' $vps_user@$vps_ip:/home/$vps_user/backups_dokploy/$ultimo_backup/volumes/ /var/lib/docker/volumes/
   " >/dev/null 2>&1
 
   sleep 10
-
-  # 4. Primer arranque para poder aplicar el parche de Postgres
   iniciar_procesos_dokploy "$servidor_actual"
 
-  # 5. Sincronizar credenciales de la base de datos PostgreSQL
   echo -e "   🔑 Sincronizando credenciales de la base de datos..."
   gh codespace ssh -c "$servidor_actual" -- "
     CONTENEDOR_PG=\$(docker ps -qf 'name=dokploy-postgres' | head -n 1)
@@ -392,7 +377,6 @@ migrar_backup_dokploy() {
   "
 
   sleep 10
-  # 6. CICLO FINAL DE REINICIO (Tu toque maestro)
   echo -e "   🔄 Realizando reinicio final para estabilizar servicios..."
 
   detener_procesos_dokploy "$servidor_actual"
@@ -449,7 +433,6 @@ forzar_despliegue_dokploy() {
 
   echo -e "\n🚀 Iniciando despliegue de aplicaciones en Dokploy..."
 
-  # 1. Extraer la API Key desde el archivo .env local
   local api_key=$(grep "API-KEY-DOKPLOY" .env | cut -d'"' -f2)
 
   if [ -z "$api_key" ]; then
@@ -459,22 +442,25 @@ forzar_despliegue_dokploy() {
 
   echo -e "   🔄 Contactando a la API local de Dokploy para iniciar despliegues..."
 
-  # 2. Inyectamos y ejecutamos el script complejo dentro del Codespace.
-  # Usar 'EOF' (con comillas) evita que nuestra máquina local arruine las variables del script.
-  # El "$api_key" al final de la línea se pasa como el argumento $1 al entorno remoto.
   cat <<'EOF' | gh codespace ssh -c "$servidor_actual" -- bash -s "$api_key"
   set -euo pipefail
 
-  # Recibimos la API Key enviada desde el entorno local
   DOKPLOY_TOKEN="$1"
   DOKPLOY_URL="http://localhost:3000/api"
 
-  # Instalamos jq silenciosamente en caso de que el Codespace no lo tenga instalado por defecto
   if ! command -v jq &> /dev/null; then
       sudo apt-get update >/dev/null && sudo apt-get install -y jq >/dev/null
   fi
 
-  # 1. Obtener todos los proyectos
+  # BUCLE DE ESPERA: Intentamos conectar hasta 10 veces antes de rendirnos
+  echo "   ⏳ Esperando a que el panel de Dokploy despierte por completo..."
+  for i in {1..10}; do
+      if curl -s -o /dev/null -f "http://localhost:3000"; then
+          break
+      fi
+      sleep 3
+  done
+
   PROJECTS_JSON=$(curl -s -X 'GET' "$DOKPLOY_URL/project.all" \
     -H 'accept: application/json' \
     -H "x-api-key: $DOKPLOY_TOKEN")
@@ -483,7 +469,6 @@ forzar_despliegue_dokploy() {
       local tipo=$1
       local id_key=$2
 
-      # Extraer IDs únicos ignorando los nulos
       mapfile -t ids < <(echo "$PROJECTS_JSON" | jq -r ".. | .${id_key}? | select(. != null)" | sort -u)
 
       if [[ ${#ids[@]} -eq 0 ]]; then
@@ -492,19 +477,15 @@ forzar_despliegue_dokploy() {
 
       for id in "${ids[@]}"; do
           echo "   ➡️ Desplegando $tipo: $id..."
-          # Lanzamos la petición POST para forzar el deploy
           curl -s -o /dev/null -w "      Resultado HTTP: %{http_code}\n" -X POST "$DOKPLOY_URL/${tipo}.deploy" \
               -H "accept: application/json" \
               -H "Content-Type: application/json" \
               -H "x-api-key: $DOKPLOY_TOKEN" \
               -d "{\"${id_key}\":\"${id}\"}"
-          
-          # Pausa de seguridad para no saturar el panel de Dokploy
           sleep 1
       done
   }
 
-  # 2. Ejecutar según los tipos de recursos
   deploy "postgres"    "postgresId"
   deploy "redis"       "redisId"
   deploy "mongo"       "mongoId"
@@ -518,7 +499,6 @@ EOF
 
   echo -e "🎉 Misión cumplida: Sistema Dokploy 100% sincronizado y aplicaciones en línea."
 }
-
 # ==========================================
 # VINCULACIÓN DE SEGURIDAD CON EL VPS
 # ==========================================
@@ -527,8 +507,6 @@ preparar_vincular_vps() {
 
   echo -e "\n🔑 [CONFIG] Configurando acceso seguro al VPS desde el Codespace..."
 
-  # 1. Extraer datos del archivo .env local
-  # Usamos grep y cut para obtener los valores dentro de las comillas
   local vps_ip=$(grep "VPS-IP-ADDRESS" .env | cut -d'"' -f2)
   local vps_user=$(grep "VPS-USERNAME" .env | cut -d'"' -f2)
 
@@ -539,20 +517,17 @@ preparar_vincular_vps() {
 
   echo -e "   📦 Transfiriendo llave privada (LLave.pem)..."
 
-  # 2. Enviar el contenido de LLave.pem al Codespace
-  # 'cat LLave.pem' lee el archivo local y lo inyecta vía SSH al 'cat' remoto
-  cat LLave.pem | gh codespace ssh -c "$servidor_codespace" -- "cat > ~/LLave.pem"
+  # Usamos 'sudo tee' para forzar la sobrescritura ignorando bloqueos previos
+  cat LLave.pem | gh codespace ssh -c "$servidor_codespace" -- "sudo tee \$HOME/LLave.pem > /dev/null"
 
-  # 3. Ajustar permisos y pre-aprobar el SSH (Known Hosts)
   echo -e "   🔐 Ajustando permisos y pre-aprobando identidad del VPS..."
 
   gh codespace ssh -c "$servidor_codespace" -- "
-    # Cambiamos permisos a la llave
-    chmod 400 ~/LLave.pem
+    # Aseguramos que el usuario vscode sea el dueño absoluto de la llave
+    sudo chown \$(whoami) \$HOME/LLave.pem
+    chmod 400 \$HOME/LLave.pem
     
-    # Ejecutamos un comando SSH rápido (exit) para forzar la aceptación de la llave del host
-    # Esto evita que el script se trabe preguntando 'Are you sure you want to continue connecting?'
-    ssh -o StrictHostKeyChecking=accept-new -i ~/LLave.pem $vps_user@$vps_ip exit
+    ssh -o StrictHostKeyChecking=accept-new -i \$HOME/LLave.pem $vps_user@$vps_ip exit
   " >/dev/null 2>&1
 
   echo -e "✅ Conexión Codespace -> VPS autorizada y lista."
