@@ -307,11 +307,18 @@ migrar_backup_dokploy() {
 detener_procesos_dokploy() {
   local servidor_actual="$1"
 
-  echo -e "\n🛑 [FASE 0] Iniciando apagado seguro en: $servidor_actual..."
-  echo -e "   ⏳ Congelando bases de datos para evitar corrupción en el backup..."
-  echo -e "   ⏳ Deteniendo los contenedores de las aplicaciones desplegadas..."
-  echo -e "   ⏳ Apagando el panel principal de Dokploy..."
-  echo -e "✅ Todos los procesos de Dokploy han sido detenidos correctamente."
+  echo -e "\n🛑 Iniciando apagado seguro en: $servidor_actual..."
+  echo -e "   ⏳ Deteniendo el demonio de Docker (Panel de Dokploy y aplicaciones)..."
+
+  # Nos conectamos por SSH al codespace y ejecutamos la orden como root.
+  # >/dev/null 2>&1 oculta los mensajes técnicos para mantener tu consola limpia.
+  if gh codespace ssh -c "$servidor_actual" -- "sudo killall dockerd" >/dev/null 2>&1; then
+    # Le damos un respiro de un par de segundos para que los procesos mueran por completo
+    sleep 2
+    echo -e "✅ Todos los procesos de Dokploy han sido detenidos correctamente."
+  else
+    echo -e "⚠️ Hubo un problema al intentar detener Docker, o ya estaba apagado."
+  fi
 }
 # ==========================================
 # 5. INICIAR PROCESOS (ARRANQUE SEGURO)
