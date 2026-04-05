@@ -560,16 +560,17 @@ sincronizar_registro_usuarios() {
     sqlite3 "$DB_USUARIOS" "INSERT OR IGNORE INTO usuarios (username, bloqueado, usado) VALUES ('$user', 'false', 'false');"
   done
 
-  # 3. Eliminar del registro los usuarios que ya no están en GitHub CLI
-  local usuarios_en_db
-  usuarios_en_db=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios;")
-
-  for db_user in $usuarios_en_db; do
-    if [[ ! " $todos_los_usuarios " =~ " $db_user " ]]; then
-      sqlite3 "$DB_USUARIOS" "DELETE FROM usuarios WHERE username='$db_user';"
-      echo -e "   🗑️  Usuario $db_user eliminado del registro local."
-    fi
-  done
+  # ESTE CODIGO HIZO DE NADA BORRAR TODOS LOS USUARIOS Y LUEGO CON LA 4 SE VOLVIERON A REGISTRAR
+  # # 3. Eliminar del registro los usuarios que ya no están en GitHub CLI
+  # local usuarios_en_db
+  # usuarios_en_db=$(sqlite3 "$DB_USUARIOS" "SELECT username FROM usuarios;")
+  #
+  # for db_user in $usuarios_en_db; do
+  #   if [[ ! " $todos_los_usuarios " =~ " $db_user " ]]; then
+  #     sqlite3 "$DB_USUARIOS" "DELETE FROM usuarios WHERE username='$db_user';"
+  #     echo -e "   🗑️  Usuario $db_user eliminado del registro local."
+  #   fi
+  # done
 
   # 4. Bloquear a los usuarios con tokens inválidos/caídos
   local usuarios_caidos
